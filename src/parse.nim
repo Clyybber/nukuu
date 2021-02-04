@@ -29,7 +29,7 @@ proc parseNoteLine*(input: string, defaultLength: JackNFrames, octaveLength: int
         for (toneIdx, nameIdx) in candidates:
           if charIdx < scale[toneIdx][nameIdx].len and i + charIdx < input.len and
              input[i + charIdx] == scale[toneIdx][nameIdx][charIdx]:
-            if charIdx == scale[toneIdx][nameIdx].len - 1:
+            if charIdx + 1 == scale[toneIdx][nameIdx].len:
               f = toneIdx # Definitely found one
               lengthOfTone = charIdx + 1
             else:
