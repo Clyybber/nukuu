@@ -22,10 +22,7 @@ type Note* = object
 
 import parse
 
-var notes: seq[Note]
-
-var loopNsamp: JackNFrames
-var loopIndex: JackNFrames
+var channels: seq[tuple[notes: seq[Note], loopNsamp, loopIndex: JackNFrames]]
 
 var outputPort: JackPort
 
@@ -41,28 +38,36 @@ proc process(nframes: JackNFrames, arg: pointer): cint {.cdecl.} =
       buffer[0] = 0xB0.char  #channel mode
       buffer[1] = 0x7B.char  #all notes off
       buffer[2] = 0x00.char
-    else:
-      for j in 0..<notes.len:
+    elif false:
+      for j in 0..<127:
         var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, 0, 3))
         buffer[0] = 0x80.char  #note off
-        buffer[1] = JackMidiData notes[j].freq
-        buffer[2] = JackMidiData notes[j].vel
+        buffer[1] = JackMidiData j
+        buffer[2] = JackMidiData 0
+    else:
+      for c in channels:
+        for j in 0..<c.notes.len:
+          var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, 0, 3))
+          buffer[0] = 0x80.char  #note off
+          buffer[1] = JackMidiData c.notes[j].freq
+          buffer[2] = JackMidiData c.notes[j].vel
     exit = false
     return
 
   for i in 0..<nframes:
-    for j in 0..<notes.len:
-      if loopIndex == notes[j].start:
-        var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, i, 3))
-        buffer[0] = 0x90.char  #note on
-        buffer[1] = JackMidiData notes[j].freq
-        buffer[2] = JackMidiData notes[j].vel
-      elif loopIndex == notes[j].stop:
-        var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, i, 3))
-        buffer[0] = 0x80.char  #note off
-        buffer[1] = JackMidiData notes[j].freq
-        buffer[2] = JackMidiData notes[j].vel
-    loopIndex = if loopIndex+1 >= loopNsamp: 0'u32 else: loopIndex+1
+    for c in channels.mitems:
+      for j in 0..<c.notes.len:
+        if c.loopIndex == c.notes[j].start:
+          var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, i, 3))
+          buffer[0] = 0x90.char  #note on
+          buffer[1] = JackMidiData c.notes[j].freq
+          buffer[2] = JackMidiData c.notes[j].vel
+        elif c.loopIndex == c.notes[j].stop:
+          var buffer = cast[ptr UncheckedArray[JackMidiData]](jackMidiEventReserve(portBuf, i, 3))
+          buffer[0] = 0x80.char  #note off
+          buffer[1] = JackMidiData c.notes[j].freq
+          buffer[2] = JackMidiData c.notes[j].vel
+      c.loopIndex = if c.loopIndex+1 >= c.loopNsamp: 0'u32 else: c.loopIndex+1
 
 var client: JackClient
 
@@ -96,7 +101,9 @@ proc nukuu(
   var defaultLength = JackNFrames(beatLength * client.jackGetSampleRate().float64)
 
   benchable:
-    (notes, loopNsamp) = parseNoteLine(inputLines[0], defaultLength, octaveLength, scale, scaleAllCandidates)
+    for line in inputLines:
+      let (lineNotes, lineLoopNsamp) = parseNoteLine(line, defaultLength, octaveLength, scale, scaleAllCandidates)
+      channels.add (lineNotes, lineLoopNsamp, 0.JackNFrames)
 
   if connect.len > 0:
     if client.jackConnect(jack_port_name(outputPort), connect) notin {0, EEXIST}:

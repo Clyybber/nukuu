@@ -121,6 +121,13 @@ proc parseNoteLine*(input: string, defaultLength: JackNFrames, octaveLength: int
           inc i
         currState = lastGroupStartStack[^1].prevState
         lastGroupStartStack.setLen lastGroupStartStack.len - 1
+      of '|':
+        inc i
+        # TODO: implement sync point
+      of '=':
+        # TODO: better symbol for pause?
+        inc i
+        currPos += currState.beatLength.uint32
       of ' ':
         # ignore silently
         inc i
