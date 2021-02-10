@@ -12,5 +12,5 @@ nim c src/nukuu
 ## Running nukuu
 
 ```sh
-./bin/nukuu -e="cdefgahc'
+./bin/nukuu -e="cdefgahc"
 ```
